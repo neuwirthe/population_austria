@@ -1,0 +1,60 @@
+---
+title: "get yearly data"
+author: "Erich Neuwirth"
+output: html_document
+date: '2022-04-22'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+last_year <- 2021
+```
+
+```{r}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(fs)
+  library(here)
+})
+```
+
+
+```{r}
+get_yearly_pop <- function(data_url){
+  suppressMessages(
+read_csv2(data_url)
+) |>
+  mutate(Jahr=str_sub(`C-A10-0`,5,9)) |>
+  mutate(Geschlecht=str_sub(`C-C11-0`,5,5)) |>
+  mutate(Geschlecht=c("m","w")[as.integer(Geschlecht)]) |> 
+  mutate(GKZ=str_sub(`C-GRGEMAKT-0`,10,15) |> 
+           as.integer()) |>
+  mutate(Alter=str_sub(`C-GALTEJ112-0`,11,12) |>
+           as.integer()) |>
+  mutate(pop=`F-ISIS-1` |> as.integer()) |>
+  select(Jahr,GKZ,Alter,Geschlecht,pop) 
+}
+```
+
+```{r}
+str_replace(
+ "https://data.statistik.gv.at/data/OGD_bevstandjbab2002_BevStand_xxxx.csv",
+ "xxxx",
+ as.character(2002:2021)) ->
+  link_list
+```
+
+
+```{r}
+link_list |>
+  map(get_yearly_pop) |>
+  reduce(bind_rows) ->
+  pop_yearly_gkz_age_gender
+save(pop_yearly_gkz_age_gender,
+     file=path(here(),"data",
+               "pop_yearly_gkz_age_gender.RData"))
+```
+
