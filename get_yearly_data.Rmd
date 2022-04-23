@@ -53,8 +53,16 @@ link_list |>
   map(get_yearly_pop) |>
   reduce(bind_rows) ->
   pop_yearly_gkz_age_gender
+```
+
+
+```{r}
+source_data_dir <- 
+  path(here(),"data_from_statistikat")
+if(!dir_exists(source_data_dir)) 
+  dir_create(source_data_dir)
 save(pop_yearly_gkz_age_gender,
-     file=path(here(),"data",
+     file=path(here(),"data_from_statistikat",
                "pop_yearly_gkz_age_gender.RData"))
 ```
 

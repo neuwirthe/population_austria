@@ -1,0 +1,134 @@
+---
+title: "interpolate from forecast data"
+output: html_document
+date: '2022-04-22'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+year_start <- 2010
+year_end <- 2022
+```
+
+
+```{r}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(fs)
+  library(here)
+  library(gt)
+  library(lubridate)
+})
+```
+
+```{r}
+out_dir_yearly <-
+  path(here(),"data_yearly")
+out_dir_weekly <-
+  path(here(),"data_weekly")
+```
+
+
+```{r}
+in_file <-
+  path(here(),"data_from_statistikat",
+       "pop_yearly_bl_age_gender_forecast.RData")
+```
+
+
+```{r}
+if(!file_exists(in_file)){
+knitr::knit(path(here(),"get_forecast_data.Rmd"),
+       tangle=TRUE)
+if(!dir_exists(path(here(),"data")))
+  dir_create(path(here(),"data"))
+source(path(here(),"get_forecast_data.R"))
+}
+```
+
+```{r}
+load(in_file)
+```
+
+
+```{r}
+pop_yearly_bl_age_gender_forecast |>
+  select(Jahr:pop) |>
+  group_by(Jahr,BundeslandID) |>
+  summarise(pop=sum(pop),.groups="drop") ->
+  bl_data
+bl_data |>
+  bind_rows(
+bl_data |>
+  group_by(Jahr) |>
+  summarise(pop=sum(pop),.groups="drop") |>
+  mutate(BundeslandID=10)
+) ->
+  pop_bl_yearly
+```
+
+```{r}
+if(!dir_exists(out_dir_yearly)) dir_create(out_dir_yearly)
+save(pop_bl_yearly,
+     file=path(out_dir_yearly,
+               "pop_bl_yearly.RData"))
+```
+
+```{r}
+pop_bl_weekly_skeleton <-
+  expand_grid(
+  Jahr=year_start:year_end,
+  BundeslandID=1:10,
+  Woche=1:53) |>
+  mutate(Jahr_Woche=Jahr+(Woche-1)/53)
+```
+
+```{r}
+tibble(
+Datum=paste0(year_start:year_end,"-12-31") |> as.Date(),
+Woche=isoweek(Datum),
+Jahr=year(Datum)) |>
+  filter(Woche==53) |>
+  pull(Jahr) ->
+  years_with_week_53
+```
+
+
+```{r}
+pop_bl_weekly_skeleton |>
+  left_join(
+    bind_rows(pop_bl_yearly |>
+                mutate(Woche=1),
+              pop_bl_yearly |>
+                mutate(Jahr=Jahr-1,
+                  Woche=53))
+  ) |>
+  group_by(BundeslandID) |>
+  mutate(pop_new =
+           approxfun(
+             x=cur_data()$Jahr_Woche[!is.na(pop)],
+             y=cur_data()$pop[!is.na(pop)],
+             rule=2
+           )(Jahr_Woche)) |>
+  ungroup() |>
+  select(-pop,-Jahr_Woche) |>
+  rename(pop=pop_new) |>
+  select(Jahr,Woche,BundeslandID,pop) |>
+  arrange(Jahr,Woche,BundeslandID) |>
+  filter(Woche <= 52 |
+           Jahr %in% years_with_week_53) ->
+  pop_bl_weekly
+```
+```{r}
+if(!dir_exists(out_dir_weekly)) dir_create(out_dir_weekly)
+save(pop_bl_weekly,
+     file=path(out_dir_weekly,
+               "pop_bl_weekly.RData"))
+```
+
+
+

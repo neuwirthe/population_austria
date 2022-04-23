@@ -1,0 +1,53 @@
+## ----setup, include=FALSE------------------------------
+knitr::opts_chunk$set(echo = TRUE)
+
+
+## ------------------------------------------------------
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(fs)
+  library(here)
+  library(gt)
+})
+
+
+## ------------------------------------------------------
+suppressMessages(
+read_csv2(
+  "https://data.statistik.gv.at/data/OGD_bevjahresanf_PR_BEVJA_5.csv"
+  )) |>
+  mutate(BundeslandID=str_sub(`C-B00-0`,5,6) |>
+           as.integer()) |>
+  mutate(Jahr=str_sub(`C-A10-0`,5,9)) |>
+  mutate(Alter=str_sub(`C-GALT5J99-0`,10,11) |>
+           as.integer() ) |>
+  mutate(Alter=Alter-1) |>
+  mutate(Geschlecht=str_sub(`C-C11-0`,5,5) |>
+           as.integer()) |>
+  mutate(Geschlecht=c("m","w")[Geschlecht]) |>
+  rename(pop=`F-S25V1`) |>
+  select(Jahr,BundeslandID,Alter,Geschlecht,pop,
+         `F-S25V2`:`F-S25V10`) |>
+  rename_at(vars(`F-S25V2`:`F-S25V10`),
+            \(x)paste0("pop_szen_",str_sub(x,7,8))) ->
+  pop_yearly_bl_age_gender_forecast
+
+
+## ------------------------------------------------------
+source_data_dir <- 
+  path(here(),"data_from_statistikat")
+if(!dir_exists(source_data_dir)) 
+  dir_create(source_data_dir)
+save(pop_yearly_bl_age_gender_forecast,
+     file=path(here(),"data_from_statistikat",
+               "pop_yearly_bl_age_gender_forecast.RData"))
+
+
+## ------------------------------------------------------
+suppressMessages(
+read_csv2(
+  "https://data.statistik.gv.at/data/OGD_bevjahresanf_PR_BEVJA_5_HEADER.csv",
+  col_select=1:3
+  )) |> 
+  gt()
+
